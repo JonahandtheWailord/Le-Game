@@ -1,0 +1,79 @@
+using System.Collections;
+using System.Collections.Generic;
+using Unity.VisualScripting;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.Tilemaps;
+using static UnityEditor.Progress;
+
+public class playercontroller : MonoBehaviour
+{
+    public Tilemap tilemap;
+    public float moveSpeed = 6f;
+    public ContactFilter2D movementFilter;
+    public PlayerInput playerInput;
+
+    public static Vector3Int position;
+    public static TileBase tilebase;
+    public static Collider2D interacting = null;
+
+    public static Rigidbody2D rb;
+    Vector2 intendedMovement;
+    Vector2 direction = new Vector2(0, -1);
+
+    void Start()
+    {
+        rb = GetComponent<Rigidbody2D>();
+    }
+
+    private void Update()
+    {
+        //track direction player is facing
+
+        intendedMovement = playerInput.actions["Move"].ReadValue<Vector2>();
+
+        if (!Mathf.Approximately(intendedMovement.x, 0.0f) || !Mathf.Approximately(intendedMovement.y, 0.0f))
+        {
+            direction.Set(intendedMovement.x, intendedMovement.y);
+            direction.Normalize();
+        }
+
+        //Do a Raycast to detect hits/interacting obejects
+        RaycastHit2D[] hits = new RaycastHit2D[1]; // Adjust the size based on your needs
+        int hitCount = rb.Cast(direction, movementFilter, hits, direction.magnitude);
+        interacting = hits[0].collider;
+
+        // Check if any hits were detected
+        if (hitCount > 0)
+        {
+
+            // Ensure the first hit is not null before accessing its collider
+            if (hits[0].collider != null && hits[0].collider.gameObject != null)
+            {
+                //Get Position of object we're currently interacting with
+                Vector3Int cellPosition = new Vector3Int(Vector3Int.zero.x + (int)(direction.x), Vector3Int.zero.y + (int)(direction.y), 0);
+                position = tilemap.WorldToCell(hits[0].point) + cellPosition;
+
+                //This is so we don't get the Tilemap error for objects not associated with tilemaps
+                if (hits[0].collider.TryGetComponent<Tilemap>(out Tilemap tilemp))
+                {
+                    tilebase = tilemp.GetTile(position);
+                }
+            }
+            else
+            {
+                interacting = null;
+            }
+        }
+        test_info.interactwith(interacting);
+    }
+    void FixedUpdate()
+    {
+        // Perform movement
+        
+        Vector2 velocity = intendedMovement * moveSpeed * Time.fixedDeltaTime;
+        rb.MovePosition(rb.position + velocity);
+
+       
+    }
+}
